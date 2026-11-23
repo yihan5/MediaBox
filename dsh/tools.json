@@ -1,0 +1,38 @@
+[
+  {
+    "type": "function",
+    "function": {
+      "name": "submit_media_link",
+      "description": "把一个 B 站或 YouTube 视频链接交给宿舍电脑上的 MediaBox 下载。MediaBox 会自己检查每日额度（90 分钟、5 个）和是否重复，并返回一句结果。把返回的 message 原样转述给用户即可，不要自己判断额度。",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "视频链接。可以直接传用户发来的整段分享文字，MediaBox 会自己从里面找出链接。"
+          }
+        },
+        "required": ["url"]
+      }
+    },
+    "http": {
+      "method": "POST",
+      "url": "http://127.0.0.1:8765/api/links",
+      "headers": { "Content-Type": "application/json", "X-API-Key": "<config.toml 里的 api_key>" },
+      "body": { "url": "{url}" }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "get_media_status",
+      "description": "查询 MediaBox 今天的额度使用情况、今天的下载列表、排队中的任务和最近的失败。用户问「今天还剩多少」「下好了没」时调用。",
+      "parameters": { "type": "object", "properties": {} }
+    },
+    "http": {
+      "method": "GET",
+      "url": "http://127.0.0.1:8765/api/status",
+      "headers": { "X-API-Key": "<config.toml 里的 api_key>" }
+    }
+  }
+]

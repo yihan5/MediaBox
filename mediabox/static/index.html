@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MediaBox</title>
+<style>
+  :root { color-scheme: light dark; --muted: #888; --line: rgba(128,128,128,.25); }
+  body { font: 15px/1.6 system-ui, "Microsoft YaHei", sans-serif; max-width: 760px; margin: 32px auto; padding: 0 16px; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  h2 { font-size: 15px; margin: 28px 0 8px; color: var(--muted); font-weight: 600; }
+  .quota { font-size: 17px; margin: 8px 0 20px; }
+  .muted { color: var(--muted); font-size: 13px; }
+  form { display: flex; gap: 8px; }
+  input[type=text], input[type=password] { flex: 1; padding: 8px 10px; font: inherit; border: 1px solid var(--line); border-radius: 6px; background: transparent; color: inherit; }
+  button { padding: 8px 16px; font: inherit; border: 1px solid var(--line); border-radius: 6px; background: transparent; color: inherit; cursor: pointer; }
+  button:disabled { opacity: .5; cursor: default; }
+  #msg { margin: 10px 0 0; min-height: 1.6em; }
+  #msg.accepted { color: #2a9d4b; } #msg.rejected { color: #d1453b; } #msg.duplicate { color: #c08a00; }
+  table { width: 100%; border-collapse: collapse; }
+  td { padding: 6px 4px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  td.s { white-space: nowrap; width: 5em; } td.d { white-space: nowrap; width: 5em; color: var(--muted); }
+  .err { color: #d1453b; font-size: 13px; }
+  .empty { color: var(--muted); }
+  #keybox { display: none; margin-bottom: 16px; }
+</style>
+</head>
+<body>
+  <h1>MediaBox</h1>
+  <div class="muted" id="day"></div>
+
+  <form id="keybox">
+    <input type="password" id="key" placeholder="第一次使用：输入 config.toml 里的 api_key" autocomplete="off">
+    <button type="submit">保存</button>
+  </form>
+
+  <div class="quota" id="quota">加载中…</div>
+
+  <form id="linkform">
+    <input type="text" id="link" placeholder="粘贴 B 站 / YouTube 链接（整段分享文字也可以）" autocomplete="off">
+    <button type="submit" id="submitbtn">提交</button>
+  </form>
+  <div id="msg"></div>
+
+  <h2>今天</h2>
+  <table id="today"></table>
+
+  <h2>排队中（含之前几天没下完的）</h2>
+  <table id="pending"></table>
+
+  <h2>最近失败（不计入额度）</h2>
+  <table id="failures"></table>
+
+<script>
+const STATUS = { queued: "排队中", downloading: "下载中", done: "完成", failed: "失败" };
+
+function getKey() { try { return localStorage.getItem("mediabox_key") || ""; } catch { return window._key || ""; } }
+function setKey(k) { try { localStorage.setItem("mediabox_key", k); } catch { window._key = k; } }
+
+function esc(s) {
+  return String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+async function api(path, opts = {}) {
+  const res = await fetch(path, { ...opts, headers: { "Content-Type": "application/json", "X-API-Key": getKey(), ...(opts.headers || {}) } });
+  if (res.status === 401) { showKeyBox(true); throw new Error("密钥不对，请重新输入。"); }
+  if (!res.ok) throw new Error(`请求失败：HTTP ${res.status}`);
+  return res.json();
+}
+
+function showKeyBox(show) { document.getElementById("keybox").style.display = show ? "flex" : "none"; }
+
+function renderRows(el, items, withError) {
+  if (!items.length) { el.innerHTML = `<tr><td class="empty">没有</td></tr>`; return; }
+  el.innerHTML = items.map(it => `
+    <tr>
+      <td class="s">${esc(STATUS[it.status] || it.status)}</td>
+      <td>${esc(it.title)}<div class="muted">${esc(it.platform)} · ${esc(it.media_day)}${it.height ? " · " + it.height + "P" : ""}</div>
+        ${withError && it.error ? `<div class="err">${esc(it.error)}</div>` : ""}</td>
+      <td class="d">${esc(it.duration_minutes)} 分钟</td>
+    </tr>`).join("");
+}
+
+async function refresh() {
+  if (!getKey()) { showKeyBox(true); document.getElementById("quota").textContent = "请先输入密钥。"; return; }
+  try {
+    const s = await api("/api/status");
+    showKeyBox(false);
+    document.getElementById("day").textContent = `当前日期：${s.media_day}（每天 ${s.day_starts_at_hour}:00 切换）`;
+    document.getElementById("quota").textContent = s.summary;
+    renderRows(document.getElementById("today"), s.today, true);
+    renderRows(document.getElementById("pending"), s.pending, false);
+    renderRows(document.getElementById("failures"), s.recent_failures, true);
+  } catch (e) {
+    document.getElementById("quota").textContent = e.message;
+  }
+}
+
+document.getElementById("keybox").addEventListener("submit", e => {
+  e.preventDefault();
+  setKey(document.getElementById("key").value.trim());
+  refresh();
+});
+
+document.getElementById("linkform").addEventListener("submit", async e => {
+  e.preventDefault();
+  const input = document.getElementById("link"), btn = document.getElementById("submitbtn"), msg = document.getElementById("msg");
+  const text = input.value.trim();
+  if (!text) return;
+  btn.disabled = true; msg.className = ""; msg.textContent = "正在解析链接…";
+  try {
+    const r = await api("/api/links", { method: "POST", body: JSON.stringify({ url: text }) });
+    msg.className = r.result; msg.textContent = r.message;
+    if (r.result === "accepted") input.value = "";
+  } catch (err) {
+    msg.className = "rejected"; msg.textContent = err.message;
+  } finally {
+    btn.disabled = false; refresh();
+  }
+});
+
+refresh();
+setInterval(refresh, 5000);
+</script>
+</body>
+</html>

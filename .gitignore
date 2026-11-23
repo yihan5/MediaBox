@@ -1,0 +1,9 @@
+# 含密钥和 token，不要提交
+config.toml
+cookies/
+# 数据库、日志
+data/
+# 虚拟环境
+.venv/
+__pycache__/
+*.pyc

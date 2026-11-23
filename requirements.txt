@@ -1,0 +1,5 @@
+# Python 3.11 或更新版本（需要内置的 tomllib）
+fastapi>=0.110
+uvicorn>=0.29
+# [default] 会一起装上 yt-dlp 推荐的附加组件（包括 YouTube 需要的 JS 挑战求解脚本）
+yt-dlp[default]

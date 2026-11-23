@@ -1,0 +1,61 @@
+# MediaBox 配置文件
+# 使用方法：复制一份改名为 config.toml，再按注释修改。
+# 注意：Windows 路径请用单引号 '...'，这样反斜杠 \ 不需要转义。
+
+[server]
+# 只监听本机。dsh 和管理页面都在这台电脑上，外部（包括 Tailscale 网络）访问不到。
+host = "127.0.0.1"
+port = 8765
+# 接口密钥：dsh 调用接口时放在请求头 X-API-Key 里。
+# 改成一串随机字符，比如在 PowerShell 里运行：
+#   -join ((48..57)+(65..90)+(97..122) | Get-Random -Count 32 | % {[char]$_})
+api_key = "change-me"
+
+[paths]
+# 视频存放的根目录，每天会在下面建一个文件夹，比如 D:\Share\2026-11-22\
+# 通常就是你通过 SMB 共享出去的那个文件夹。
+media_root = 'D:\Share'
+
+# 数据库和日志放在哪里（相对路径 = 相对于本项目文件夹）
+data_dir = 'data'
+
+# B 站 cookie（Netscape 格式的 cookies.txt）。不配置的话最高只有 480P。
+# 留空 "" 表示不用。
+bilibili_cookies = 'cookies\bilibili.txt'
+
+# YouTube 一般不需要 cookie。只有遇到「请登录以确认你不是机器人」时才配置。
+youtube_cookies = ""
+
+# 作为 Windows 服务运行时，看不到你个人账户的 PATH。
+# 如果 ffmpeg 或 deno 是装在用户目录下的（winget 默认就是），把它们所在的文件夹写在这里。
+# 例：extra_bin_dirs = ['C:\tools\ffmpeg\bin', 'C:\tools\deno']
+extra_bin_dirs = []
+
+[quota]
+# 每天最多下载的总时长（分钟）和个数，两个条件都要满足。
+daily_minutes = 90
+daily_count = 5
+# 「一天」从几点开始算。2 表示凌晨 2 点切换，凌晨 1:59 提交的仍算前一天。
+day_starts_at_hour = 2
+
+[download]
+# 最高分辨率
+max_height = 1080
+# 优先 H.264 编码。false = 不限制编码（文件更小，但 VP9/AV1 在 iPhone 上要靠 VLC 软解，比较费电）
+# 以后如果觉得费电，改成 true 即可。
+prefer_h264 = false
+# 字幕语言（支持正则）。只下载人工字幕，不下载 YouTube 自动生成的字幕。
+subtitle_langs = ["zh.*", "en.*"]
+# 限速，比如 "5M" 或 "800K"。留空 "" 表示不限速。
+rate_limit = ""
+# 文件名里标题最多多少字节（一个中文字约 3 字节）
+title_max_bytes = 120
+# B 站下载到的画质低于这个值时，提醒你 cookie 可能过期
+bilibili_min_expected_height = 720
+
+[telegram]
+# 下载完成 / 失败时发通知。用 dsh 现在用的那个 bot 就行（只发消息，不会和 dsh 抢消息）。
+# 两项都留空 "" 表示不发通知。
+bot_token = ""
+# 你和 bot 的私聊 chat_id（一串数字）。获取方法见 README。
+chat_id = ""
